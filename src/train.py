@@ -125,6 +125,9 @@ def train(
 
     best_mean = -np.inf
     for itr in range(n_iter):
+        if itr % 100 == 0:
+            agent.save(logdir + f'e{itr:03d}_')
+
         print("********** Iteration %i ************" % itr)
 
         paths, timesteps_this_batch = agent.sample_trajectories(itr, env)
@@ -193,10 +196,9 @@ def train(
 
         if metrics['reward_mean'] >= best_mean:
             best_mean = metrics['reward_mean']
-            agent.save(logdir)
+            agent.save(logdir + 'best_')
             if verbose:
                 print('Higher mean. Saved weights.')
-
 
         # if itr % 10 == 0:
         #     agent.save(logdir)
@@ -204,3 +206,4 @@ def train(
         past = time.time()
 
     # agent.save(logdir)
+    agent.save(logdir + f'e{n_iter:03d}_')
