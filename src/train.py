@@ -103,9 +103,9 @@ def train(
         tilde=tilde,
         init_trunc_norm=init_trunc_norm,
     )
-    # wb.watch(agent.rnn, log='all', log_freq=1)
+    wb.watch(agent.rnn, log='gradients', log_freq=1)
     # if agent.nn_baseline:
-    #     wb.watch(agent.mlp, log='all', log_freq=1)
+    #     wb.watch(agent.mlp, log='gradients', log_freq=1)
 
     if tilde:
         AG, BG, CG = env.get_system_params()

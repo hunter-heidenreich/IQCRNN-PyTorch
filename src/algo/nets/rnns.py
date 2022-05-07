@@ -94,7 +94,18 @@ class RobustRNNCell(nn.Module):
                 nn.init.zeros_(self._W_v.bias)
 
         # log std. dev.
-        self.log_std = nn.Parameter(data=torch.full((self._nu,), np.log(0.2)))
+        # self.log_std = nn.Parameter(
+        #     data=torch.full((self._nu,), np.log(0.2)),
+        #     requires_grad=True
+        # )
+        self.log_std = nn.Linear(
+            1,
+            self._nu,
+            bias=False,
+            device=self._device,
+            dtype=self._dtype,
+        )
+        nn.init.constant_(self.log_std.weight, np.log(0.2))
 
     def forward(
             self,
@@ -122,7 +133,9 @@ class RobustRNNCell(nn.Module):
         #  xi(k+1) = AK  xi(k) + BK1 w(k) + BK2 y(k)
         xi_ = self._W_xi(xi_w_y)  # (B, S), (S,)
 
-        return u, xi_
+        log_std = self.log_std(torch.ones(1) if y.dim() == 1 else torch.ones((u.size(0), 1)))
+
+        return u, xi_, log_std
 
     def get_weights(self):
         return {
@@ -160,9 +173,9 @@ class RobRNNActor(RobustRNNCell):
             xi=None,  # ([B]atch, [S]tate), or just (S,)
             eps=1e-8,
     ):
-        u, xi_ = super(RobRNNActor, self).forward(y, xi=xi)
+        u, xi_, log_std = super(RobRNNActor, self).forward(y, xi=xi)
 
-        dist = Normal(u, (eps + self.log_std).exp())
+        dist = Normal(u, (eps + log_std).exp())
         action = dist.sample()
         log_p = dist.log_prob(action)
 
@@ -267,7 +280,15 @@ class RobustRNNCellTilde(nn.Module):
                 nn.init.zeros_(self._W_v.bias)
 
         # log std. dev.
-        self.log_std = nn.Parameter(data=torch.full((self._nu,), np.log(0.2)))
+        # self.log_std = nn.Parameter(data=torch.full((self._nu,), np.log(0.2)))
+        self.log_std = nn.Linear(
+            1,
+            self._nu,
+            bias=False,
+            device=self._device,
+            dtype=self._dtype,
+        )
+        nn.init.constant_(self.log_std.weight, np.log(0.2))
 
     def forward(
             self,
@@ -301,7 +322,10 @@ class RobustRNNCellTilde(nn.Module):
         #  xi(k+1) = AK  xi(k) + BK1 w(k) + BK2 y(k)
         xi_ = self._W_xi(xi_w_y)  # (B, S), (S,)
 
-        return u, xi_
+        log_std = self.log_std(
+            torch.ones(1) if y.dim() == 1 else torch.ones((u.size(0), 1)))
+
+        return u, xi_, log_std
 
     def new_activation(self, v):
         w = self._act(v)
@@ -351,9 +375,9 @@ class RobRNNTildeActor(RobustRNNCellTilde):
             xi=None,  # ([B]atch, [S]tate), or just (S,)
             eps=1e-8,
     ):
-        u, xi_ = super(RobRNNTildeActor, self).forward(y, xi=xi)
+        u, xi_, log_std = super(RobRNNTildeActor, self).forward(y, xi=xi)
 
-        dist = Normal(u, (eps + self.log_std).exp())
+        dist = Normal(u, (eps + log_std).exp())
         action = dist.sample()
         log_p = dist.log_prob(action)
 
