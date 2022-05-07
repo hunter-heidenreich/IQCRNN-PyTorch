@@ -1,9 +1,9 @@
 import os
 import time
 
-from src.train import train
-
 import wandb as wb
+
+from src.train import train
 
 
 def main():
