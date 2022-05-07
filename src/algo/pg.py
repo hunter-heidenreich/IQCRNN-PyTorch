@@ -21,7 +21,8 @@ class PGAgent:
             computation_graph_args,
             sample_trajectory_args,
             estimate_return_args,
-            tilde=False
+            tilde=False,
+            init_trunc_norm=False,
     ):
         super(PGAgent, self).__init__()
         self._init_dicts = {
@@ -64,7 +65,7 @@ class PGAgent:
                     self.ac_dim,
                     bias=self.rnn_bias,
                     dtype=torch.float32,
-                    use_trunc_normal=True,
+                    use_trunc_normal=init_trunc_norm,
                 )
             else:
                 self.rnn = RobRNNActor(
@@ -74,6 +75,7 @@ class PGAgent:
                     self.ac_dim,
                     bias=self.rnn_bias,
                     dtype=torch.float32,
+                    use_trunc_normal=init_trunc_norm,
                 )
 
         self.opt = torch.optim.Adam(
@@ -87,7 +89,7 @@ class PGAgent:
                 self.size,
                 self.n_layers,
                 dtype=torch.float32,
-                use_trunc_normal=tilde,
+                use_trunc_normal=init_trunc_norm,
             )
             self.baseline_opt = torch.optim.Adam(
                 self.mlp.parameters(),

@@ -17,7 +17,8 @@ class RobustRNNCell(nn.Module):
             bias: bool = True,
             nonlinearity: str = "tanh",
             device=None,
-            dtype=None
+            dtype=None,
+            use_trunc_normal=False,
     ):
         super(RobustRNNCell, self).__init__()
 
@@ -27,6 +28,7 @@ class RobustRNNCell(nn.Module):
         self._nu = output_size
 
         self._init_std = 1e-4
+        self._use_trunc_normal = use_trunc_normal
 
         self._bias = bias
         self._nl = nonlinearity
@@ -60,9 +62,10 @@ class RobustRNNCell(nn.Module):
             device=self._device,
             dtype=self._dtype,
         )
-        # nn.init.trunc_normal_(self._W_xi.weight, std=self._init_std)
-        # if self._bias:
-        #     nn.init.zeros_(self._W_xi.bias)
+        if self._use_trunc_normal:
+            nn.init.trunc_normal_(self._W_xi.weight, std=self._init_std)
+            if self._bias:
+              nn.init.zeros_(self._W_xi.bias)
 
         # u
         self._W_u = nn.Linear(
@@ -72,9 +75,10 @@ class RobustRNNCell(nn.Module):
             device=self._device,
             dtype=self._dtype,
         )
-        # nn.init.trunc_normal_(self._W_u.weight, std=self._init_std)
-        # if self._bias:
-        #     nn.init.zeros_(self._W_u.bias)
+        if self._use_trunc_normal:
+            nn.init.trunc_normal_(self._W_u.weight, std=self._init_std)
+            if self._bias:
+                nn.init.zeros_(self._W_u.bias)
 
         # v
         self._W_v = nn.Linear(
@@ -84,9 +88,10 @@ class RobustRNNCell(nn.Module):
             device=self._device,
             dtype=self._dtype,
         )
-        # nn.init.trunc_normal_(self._W_v.weight, std=self._init_std)
-        # if self._bias:
-        #     nn.init.zeros_(self._W_v.bias)
+        if self._use_trunc_normal:
+            nn.init.trunc_normal_(self._W_v.weight, std=self._init_std)
+            if self._bias:
+                nn.init.zeros_(self._W_v.bias)
 
         # log std. dev.
         self.log_std = nn.Parameter(data=torch.full((self._nu,), np.log(0.2)))
@@ -232,9 +237,8 @@ class RobustRNNCellTilde(nn.Module):
         )
         if self._use_trunc_normal:
             nn.init.trunc_normal_(self._W_xi.weight, std=self._init_std)
-
-        # if self._bias:
-        #     nn.init.zeros_(self._W_xi.bias)
+            if self._bias:
+                nn.init.zeros_(self._W_xi.bias)
 
         # u
         self._W_u = nn.Linear(
@@ -246,9 +250,8 @@ class RobustRNNCellTilde(nn.Module):
         )
         if self._use_trunc_normal:
             nn.init.trunc_normal_(self._W_u.weight, std=self._init_std)
-
-        # if self._bias:
-        #     nn.init.zeros_(self._W_u.bias)
+            if self._bias:
+                nn.init.zeros_(self._W_u.bias)
 
         # v
         self._W_v = nn.Linear(
@@ -260,9 +263,8 @@ class RobustRNNCellTilde(nn.Module):
         )
         if self._use_trunc_normal:
             nn.init.trunc_normal_(self._W_v.weight, std=self._init_std)
-
-        # if self._bias:
-        #     nn.init.zeros_(self._W_v.bias)
+            if self._bias:
+                nn.init.zeros_(self._W_v.bias)
 
         # log std. dev.
         self.log_std = nn.Parameter(data=torch.full((self._nu,), np.log(0.2)))
