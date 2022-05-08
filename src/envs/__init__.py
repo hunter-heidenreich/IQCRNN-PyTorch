@@ -14,6 +14,10 @@ from .powergrid import PowergridEnv
 from .powergrid import PowergridEnvPartial
 from .powergrid import PowergridEnvPartialNorm
 
+from .vehicle import VehliceEnv
+from .vehicle import VehliceEnvPartial
+from .vehicle import VehliceEnvPartialNorm
+
 
 def get_env(exp_name, factor):
     if 'cartpole' in exp_name:
@@ -44,6 +48,13 @@ def get_env(exp_name, factor):
             env = PowergridEnvPartial(factor=factor)
         else:
             env = PowergridEnv(factor=factor)
+    elif 'vehicle' in exp_name:
+        if 'partial' in exp_name and 'norm' in exp_name:
+            env = VehliceEnvPartialNorm(factor=factor)
+        elif 'partial' in exp_name:
+            env = VehliceEnvPartial(factor=factor)
+        else:
+            env = VehliceEnv(factor=factor)
     else:
         raise ValueError('Unrecognized environment in experiment name: ' + exp_name)
 
