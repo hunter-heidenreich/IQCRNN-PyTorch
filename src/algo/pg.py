@@ -372,8 +372,9 @@ class PGAgent:
         n = len(ob_no) // t  # number of chunks (new n, aka batch size)
 
         # Slicing into compatible sizes
-        adv_nt = adv_n[:n*t].reshape(n, t)
-        logprob_nt = lp_n[:n*t].reshape(n, t)
+        adv_nt = adv_n[:n*t].reshape(n, t, -1)
+        logprob_nt = lp_n[:n*t].reshape(n, t, -1)
+
         policy_loss = (-adv_nt * logprob_nt).mean()
 
         policy_loss.backward()
