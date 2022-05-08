@@ -1,6 +1,9 @@
 from .cartpole import CartpoleEnv
 from .cartpole import CartpoleEnvPartial
 from .cartpole import CartpoleEnvPartialNorm
+from .pendubot import PendubotEnv
+from .pendubot import PendubotEnvPartial
+from .pendubot import PendubotEnvPartialNorm
 from .pendulum import InvPendulumLinEnv
 from .pendulum import InvPendulumLinEnvPartial
 from .pendulum import InvPendulumLinEnvPartialNorm
@@ -21,6 +24,13 @@ def get_env(exp_name, factor):
             env = InvPendulumLinEnvPartial(factor=factor)
         else:
             env = InvPendulumLinEnv(factor=factor)
+    elif 'pendubot' in exp_name:
+        if 'partial' in exp_name and 'norm' in exp_name:
+            env = PendubotEnvPartialNorm(factor=factor)
+        elif 'partial' in exp_name:
+            env = PendubotEnvPartial(factor=factor)
+        else:
+            env = PendubotEnv(factor=factor)
     else:
         raise ValueError('Unrecognized environment in experiment name: ' + exp_name)
 
