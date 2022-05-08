@@ -332,7 +332,7 @@ class Projector:
 
             bad_statuses = {
                 mf.SolutionStatus.Undefined,
-                mf.SolutionStatus.IllposedCert,
+                # mf.SolutionStatus.IllposedCert,
                 # mf.SolutionStatus.Certificate,
             }
             if (M.getPrimalSolutionStatus() in bad_statuses) or \

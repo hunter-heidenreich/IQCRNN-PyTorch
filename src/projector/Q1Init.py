@@ -4,7 +4,7 @@ import numpy as np
 
 
 class Q1_init(object):
-    eps = 1e-5
+    eps = 1e-8
     def __init__(self, AG, BG, CG=None):
         """
         Give projected results of

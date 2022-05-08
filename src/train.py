@@ -4,6 +4,7 @@ import time
 
 import gym
 import numpy as np
+import scipy
 import torch
 import wandb as wb
 
@@ -12,6 +13,7 @@ from src.algo.pg import PGAgent
 from src.envs import get_env
 # from src.projector.method import Projector
 from src.projector.method2 import Projector
+from src.projector.Q1Init import Q1_init
 
 
 def train(
@@ -110,6 +112,11 @@ def train(
 
     if tilde:
         AG, BG, CG = env.get_system_params()
+
+        Q1initializer = Q1_init(AG, BG, CG=CG)
+        Q1 = Q1initializer.compute()
+        Q10 = scipy.linalg.block_diag(Q1, np.eye(states_size - env.nx))
+
         projector = Projector(
             computation_graph_args['states_size'],
             computation_graph_args['size'],
