@@ -1,3 +1,5 @@
+import cvxpy as cp
+
 import torch
 
 import numpy as np
@@ -323,42 +325,150 @@ class Projector:
             print(M.getPrimalSolutionStatus())
             print(M.getDualSolutionStatus())
 
-            # if (M.getPrimalSolutionStatus() in {mf.SolutionStatus.Unknown, mf.SolutionStatus.Optimal, mf.SolutionStatus.Feasible, mf.SolutionStatus.Certificate})\
-            #         and (M.getDualSolutionStatus() in {mf.SolutionStatus.Unknown, mf.SolutionStatus.Optimal, mf.SolutionStatus.Feasible, mf.SolutionStatus.Certificate}):
-            #
-            #     print('Pushed update.')
-            # else:
-            #     return [AK0, BK10, BK20, CK10, DK10, DK20, CK20, DK30]
-
-            bad_statuses = {
-                mf.SolutionStatus.Undefined,
-                mf.SolutionStatus.IllposedCert,
-                # mf.SolutionStatus.Certificate,
-            }
-            if (M.getPrimalSolutionStatus() in bad_statuses) or \
-                    (M.getDualSolutionStatus() in bad_statuses):
-                print('Rejecting MOSEK solution due to bad status.')
-                return [AK0, BK10, BK20, CK10, DK10, DK20, CK20, DK30]
-
-            AK = np.reshape(vAK.level(), [xi_dim, xi_dim])
-            BK1 = np.reshape(vBK1.level(), [xi_dim, z_dim])
-            BK2 = np.reshape(vBK2.level(), [xi_dim, y_dim])
-            CK1 = np.reshape(vCK1.level(), [u_dim, xi_dim])
-            DK1 = np.reshape(vDK1.level(), [u_dim, z_dim])
-            DK2 = np.reshape(vDK2.level(), [u_dim, y_dim])
-            CK2 = np.reshape(vCK2.level(), [z_dim, xi_dim])
-            DK3 = np.reshape(vDK3.level(), [z_dim, y_dim])
-            Q10 = np.reshape(vQ1r.level(), [xi_dim + x_dim,
-                                            xi_dim + x_dim]) + self.eps * np.eye(
-                xi_dim + x_dim)
-            Q20 = np.diag(vQ2d.level())
+            if (M.getPrimalSolutionStatus() in {mf.SolutionStatus.Unknown, mf.SolutionStatus.Optimal, mf.SolutionStatus.Feasible})\
+                    or (M.getDualSolutionStatus() in {mf.SolutionStatus.Unknown, mf.SolutionStatus.Optimal, mf.SolutionStatus.Feasible}):
+                AK = np.reshape(vAK.level(), [xi_dim, xi_dim])
+                BK1 = np.reshape(vBK1.level(), [xi_dim, z_dim])
+                BK2 = np.reshape(vBK2.level(), [xi_dim, y_dim])
+                CK1 = np.reshape(vCK1.level(), [u_dim, xi_dim])
+                DK1 = np.reshape(vDK1.level(), [u_dim, z_dim])
+                DK2 = np.reshape(vDK2.level(), [u_dim, y_dim])
+                CK2 = np.reshape(vCK2.level(), [z_dim, xi_dim])
+                DK3 = np.reshape(vDK3.level(), [z_dim, y_dim])
+                Q10 = np.reshape(vQ1r.level(), [xi_dim + x_dim,
+                                                xi_dim + x_dim]) + self.eps * np.eye(
+                    xi_dim + x_dim)
+                Q20 = np.diag(vQ2d.level())
 
             self.Q10 = Q10
             self.Q20 = Q20
 
         return [AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3]
 
-    def updateRNN(self, rnn, clip_value=0.2):
+    def project(self, AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3, Q10=None,
+                Q20=None, loss=None):
+        """
+              ~        ~    ~         ~
+        S =  {AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3, Q1^, Q2^}, ^: not required
+        Q10, Q20, loss will override default (Last Q1, Q2 and self.loss)
+        """
+        xi_dim = self.xi_dim
+        x_dim = self.x_dim
+        z_dim = self.z_dim
+        y_dim = np.shape(self.CG)[0]
+        u_dim = np.shape(self.BG)[1]
+
+        AG = self.AG
+        BG = self.BG
+        CG = self.CG
+
+        Bphi = self.Bphi
+        Aphi = self.Aphi
+
+        Q1 = Q10 if Q10 is not None else self.Q10
+        Q2 = Q20 if Q20 is not None else self.Q20
+        Q1i = np.linalg.inv(Q1)
+        Q2i = np.linalg.inv(Q2)
+        loss = loss if loss is not None else self.loss
+        Q2_invert = self.Q2_invert
+
+        ########## CVXPY ##########
+        vAK = cp.Variable((xi_dim, xi_dim))
+        vBK1 = cp.Variable((xi_dim, z_dim))
+        vBK2 = cp.Variable((xi_dim, y_dim))
+        vCK1 = cp.Variable((u_dim, xi_dim))
+        vDK1 = cp.Variable((u_dim, z_dim))
+        vDK2 = cp.Variable((u_dim, y_dim))
+        vCK2 = cp.Variable((z_dim, xi_dim))
+        vDK3 = cp.Variable((z_dim, y_dim))
+
+        vQ1 = cp.Variable((xi_dim + x_dim, xi_dim + x_dim), symmetric=True)
+        vQ2 = cp.diag(cp.Variable((z_dim)))  ## TODO: verify
+
+        obj = cp.sum_squares(vAK - AK) + \
+              cp.sum_squares(vBK1 - BK1) + \
+              cp.sum_squares(vBK2 - BK2) + \
+              cp.sum_squares(vCK1 - CK1) + \
+              cp.sum_squares(vDK1 - DK1) + \
+              cp.sum_squares(vDK2 - DK2) + \
+              cp.sum_squares(vCK2 - CK2) + \
+              cp.sum_squares(vDK3 - DK3) + \
+              cp.sum_squares(vQ1 - Q1) + \
+              cp.sum_squares(vQ2 - Q2)
+
+        if loss:
+            obj + loss(Q1, Q2)
+
+        A = cp.bmat([
+            [AG + BG @ vDK2 @ CG, BG @ vCK1],
+            [vBK2 @ CG, vAK]
+        ])
+
+        B = cp.bmat([
+            [BG @ vDK1 @ (Bphi - Aphi) / 2],
+            [vBK1 @ (Bphi - Aphi) / 2]
+        ])
+
+        C = cp.bmat([[vDK3 @ CG, vCK2]])
+
+        D = np.zeros((z_dim, z_dim))
+
+        # TODO: Make it Q11, Q22, Q33, Q44.
+        if not Q2_invert:
+            LMI = cp.bmat([
+                [2 * Q1i - Q1i @ vQ1 @ Q1i, np.zeros((xi_dim + x_dim, z_dim)),
+                 A.T, C.T],
+                [np.zeros((z_dim, xi_dim + x_dim)), 2 * Q2i - Q2i @ vQ2 @ Q2i,
+                 B.T, D.T],
+                [A, B, vQ1, np.zeros((xi_dim + x_dim, z_dim))],
+                [C, D, np.zeros((z_dim, xi_dim + x_dim)), vQ2]
+            ])
+        else:
+            LMI = cp.bmat([
+                [2 * Q1i - Q1i @ vQ1 @ Q1i, np.zeros((xi_dim + x_dim, z_dim)),
+                 A.T, C.T],
+                [np.zeros((z_dim, xi_dim + x_dim)), vQ2, B.T, D.T],
+                [A, B, vQ1, np.zeros((xi_dim + x_dim, z_dim))],
+                [C, D, np.zeros((z_dim, xi_dim + x_dim)),
+                 2 * Q2i - Q2i @ vQ2 @ Q2i]
+            ])
+
+        # cons = [LMI >> 0, vQ1 >> self.eps*np.eye(xi_dim+x_dim), cp.diag(vQ2) >= self.eps]
+
+        # import pdb
+        # pdb.set_trace()
+
+        cons = [
+            # LMI >> self.eps * np.eye(len(LMI)),
+            LMI >> self.eps * np.eye(LMI.shape[0]),
+            vQ1 >> self.eps * np.eye(xi_dim + x_dim),
+            cp.diag(vQ2) >= self.eps
+        ]
+        prob = cp.Problem(cp.Minimize(obj), cons)
+        result = prob.solve(
+            solver="MOSEK",
+            verbose=True
+        )  # plz install MOSEK to your python https://www.cvxpy.org/install/index.html
+        # result = prob.solve(solver="SCS")  # The SCS solver seems to be fast
+
+        AK = vAK.value
+        BK1 = vBK1.value
+        BK2 = vBK2.value
+        CK1 = vCK1.value
+        DK1 = vDK1.value
+        DK2 = vDK2.value
+        CK2 = vCK2.value
+        DK3 = vDK3.value
+
+        Q10 = vQ1.value
+        Q20 = vQ2.value
+
+        self.Q10 = Q10
+        self.Q20 = Q20
+
+        return [AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3]
+
+    def updateRNN(self, rnn):
         wts = rnn.get_weights()
         AK = wts['AK']
         BK1 = wts['BK1']
@@ -375,27 +485,22 @@ class Projector:
         CK1 = CK1 + DK1 @ (self.Aphi + self.Bphi) / 2 @ CK2
         DK2 = DK2 + DK1 @ (self.Aphi + self.Bphi) / 2 @ DK3
 
-        # AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3 = self.project(AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3)
-        AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3 = self.projectMOSEK(AK, BK1, BK2,
-                                                                  CK1, DK1,
-                                                                  DK2, CK2,
-                                                                  DK3)
-        # backward conversion
-        try:
-            AK = AK - BK1 @ (self.Aphi + self.Bphi) / 2 @ CK2
-            BK2 = BK2 - BK1 @ (self.Aphi + self.Bphi) / 2 @ DK3
-            CK1 = CK1 - DK1 @ (self.Aphi + self.Bphi) / 2 @ CK2
-            DK2 = DK2 - DK1 @ (self.Aphi + self.Bphi) / 2 @ DK3
-        except ValueError as e:
-            print(e)
-            import pdb
-            pdb.set_trace()
+        AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3 = self.project(AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3)
+        # AK, BK1, BK2, CK1, DK1, DK2, CK2, DK3 = self.projectMOSEK(AK, BK1, BK2,
+        #                                                           CK1, DK1,
+        #                                                           DK2, CK2,
+        #                                                           DK3)
 
-        return rnn.set_weights(
+        # backward conversion
+        AK = AK - BK1 @ (self.Aphi + self.Bphi) / 2 @ CK2
+        BK2 = BK2 - BK1 @ (self.Aphi + self.Bphi) / 2 @ DK3
+        CK1 = CK1 - DK1 @ (self.Aphi + self.Bphi) / 2 @ CK2
+        DK2 = DK2 - DK1 @ (self.Aphi + self.Bphi) / 2 @ DK3
+
+        rnn.set_weights(
             torch.FloatTensor(AK), torch.FloatTensor(BK1), torch.FloatTensor(BK2),
             torch.FloatTensor(CK1), torch.FloatTensor(DK1), torch.FloatTensor(DK2),
             torch.FloatTensor(CK2), torch.FloatTensor(DK3),
-            clip_value=clip_value
         )
 
     @staticmethod

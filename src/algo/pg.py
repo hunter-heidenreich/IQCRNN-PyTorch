@@ -365,6 +365,8 @@ class PGAgent:
                 base_loss.backward()
                 self.baseline_opt.step()
 
+        self.opt.zero_grad(set_to_none=True)
+
         # Now we have to slice the samples into chunks for rnn
         t = self.step_num
         n = len(ob_no) // t  # number of chunks (new n, aka batch size)
@@ -374,9 +376,17 @@ class PGAgent:
         logprob_nt = lp_n[:n*t].reshape(n, t)
         policy_loss = (-adv_nt * logprob_nt).mean()
 
-        self.opt.zero_grad(set_to_none=True)
         policy_loss.backward()
-        nn.utils.clip_grad_value_(self.rnn.parameters(), 10.0)
+
+        # nn.utils.clip_grad_value_(self.rnn.parameters(), 10.0)
+        nn.utils.clip_grad_value_(self.rnn.parameters(), 0.5)
+        # nn.utils.clip_grad_value_(self.rnn.parameters(), 0.3)
+        # nn.utils.clip_grad_value_(self.rnn.parameters(), 0.1)
+
+        # nn.utils.clip_grad_norm_(self.rnn.parameters(), 10.0)
+        # nn.utils.clip_grad_norm_(self.rnn.parameters(), 2.0)
+        # print(nn.utils.clip_grad_norm_(self.rnn.parameters(), max_norm=0.01, norm_type='inf'))
+
         self.opt.step()
 
         if self.nn_baseline:

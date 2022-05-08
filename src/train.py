@@ -10,6 +10,7 @@ import wandb as wb
 from src.algo.pg import pathlength
 from src.algo.pg import PGAgent
 from src.envs import get_env
+# from src.projector.method import Projector
 from src.projector.method2 import Projector
 
 
@@ -150,7 +151,7 @@ def train(
             a_loss = out
 
         if tilde:
-            projector.updateRNN(agent.rnn)
+            totdiff, xidiff, udiff, vdiff = projector.updateRNN(agent.rnn)
 
         # Log diagnostics
         returns = [path["reward"].sum() for path in paths]
@@ -166,8 +167,17 @@ def train(
             'timesteps_iter': timesteps_this_batch,
             'loss_actor': a_loss,
         }
+
         if agent.nn_baseline:
             metrics['loss_critic'] = c_loss
+
+        if tilde:
+            metrics['diff_total'] = totdiff
+            metrics['diff_xi'] = xidiff
+            metrics['diff_u'] = udiff
+            metrics['diff_v'] = vdiff
+
+
         for key, vals in [
             ('reward', returns),
             ('eplen', ep_lengths)

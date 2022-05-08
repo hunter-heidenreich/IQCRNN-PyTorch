@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+
+import torch.linalg as tla
 import torch.nn as nn
 import torch.nn.functional as tfx
 
@@ -360,11 +362,43 @@ class RobustRNNCellTilde(nn.Module):
             AK, BK1, BK2,
             CK1, DK1, DK2,
             CK2, DK3,
+            clip_value=None,
     ):
         with torch.no_grad():
-            self._W_xi.weight.data = torch.cat((AK, BK1, BK2), dim=-1)
-            self._W_u.weight.data = torch.cat((CK1, DK1, DK2), dim=-1)
-            self._W_v.weight.data = torch.cat((CK2, DK3), dim=-1)
+            W_xi = torch.cat((AK, BK1, BK2), dim=-1)
+            W_u = torch.cat((CK1, DK1, DK2), dim=-1)
+            W_v = torch.cat((CK2, DK3), dim=-1)
+
+            # norms pre-clamp
+            wxi = tla.norm(self._W_xi.weight.data - W_xi, ord='fro')
+            wu = tla.norm(self._W_u.weight.data - W_u, ord='fro')
+            wv = tla.norm(self._W_v.weight.data - W_v, ord='fro')
+            tot = wxi + wu + wv
+
+            if clip_value is not None:
+                diff_xi = W_xi - self._W_xi.weight.data
+                diff_xi = torch.clamp(diff_xi, min=-clip_value, max=clip_value)
+                W_xi = self._W_xi.weight.data + diff_xi
+
+                diff_u = W_u - self._W_u.weight.data
+                diff_u = torch.clamp(diff_u, min=-clip_value, max=clip_value)
+                W_u = self._W_u.weight.data + diff_u
+
+                diff_v = W_v - self._W_v.weight.data
+                diff_v = torch.clamp(diff_v, min=-clip_value, max=clip_value)
+                W_v = self._W_v.weight.data + diff_v
+
+                wxi = tla.norm(self._W_xi.weight.data - W_xi, ord='fro')
+                wu = tla.norm(self._W_u.weight.data - W_u, ord='fro')
+                wv = tla.norm(self._W_v.weight.data - W_v, ord='fro')
+                tot = wxi + wu + wv
+
+            self._W_xi.weight.data = W_xi
+            self._W_u.weight.data = W_u
+            self._W_v.weight.data = W_v
+
+            return tot, wxi, wu, wv
+
 
 
 class RobRNNTildeActor(RobustRNNCellTilde):
