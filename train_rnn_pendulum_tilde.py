@@ -46,7 +46,7 @@ def main():
 
     max_path_length = args.ep_len if args.ep_len > 0 else None
 
-    disp_name = f'Pendulum(proj={args.tilde}, init={"trunc. normal" if args.init_trunc_normal else "uniform"})'
+    disp_name = f'Pendulum(proj={args.tilde}, init={"trunc. normal" if args.init_trunc_norm else "uniform"})'
     wb.init(config=vars(args), project='IQCRNN', name=disp_name)
 
     train(
