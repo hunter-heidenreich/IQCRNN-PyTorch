@@ -332,7 +332,7 @@ class PGAgent:
 
         return q_n, adv_n.squeeze()
 
-    def update_parameters(self, ob_no, q_n, adv_n, lp_n):
+    def update_parameters(self, ob_no, q_n, adv_n, lp_n, grad_clip=0.5):
         """
             Update the parameters of the policy and (possibly) the neural network baseline,
             which is trained to approximate the value function.
@@ -380,7 +380,7 @@ class PGAgent:
         policy_loss.backward()
 
         # nn.utils.clip_grad_value_(self.rnn.parameters(), 10.0)
-        nn.utils.clip_grad_value_(self.rnn.parameters(), 0.5)
+        nn.utils.clip_grad_value_(self.rnn.parameters(), grad_clip)
         # nn.utils.clip_grad_value_(self.rnn.parameters(), 0.3)
         # nn.utils.clip_grad_value_(self.rnn.parameters(), 0.1)
 

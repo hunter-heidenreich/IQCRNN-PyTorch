@@ -13,7 +13,9 @@ from src.algo.pg import PGAgent
 from src.envs import get_env
 # from src.projector.method import Projector
 from src.projector.method2 import Projector
+from src.projector.method_IQC import ProjectorIQC
 from src.projector.Q1Init import Q1_init
+from src.projector.Q1InitIQC import Q1_init as IQC_init
 
 
 def train(
@@ -38,7 +40,10 @@ def train(
         factor,
         tilde,
         init_trunc_norm,
-        verbose=True
+        verbose=True,
+        grad_clip_val=0.5,
+        proj_clip_val=0.2,
+        iqc=False,
 ):
     # configure logger
     os.makedirs(logdir, exist_ok=True)
@@ -111,17 +116,30 @@ def train(
     #     wb.watch(agent.mlp, log='gradients', log_freq=1)
 
     if tilde:
-        AG, BG, CG = env.get_system_params()
+        if iqc:
+            print('Using IQC projector....')
 
-        Q1initializer = Q1_init(AG, BG, CG=CG)
-        Q1 = Q1initializer.compute()
-        Q10 = scipy.linalg.block_diag(Q1, np.eye(states_size - env.nx))
+            Q1initializer = IQC_init(env)
+            Q1init = Q1initializer.compute()
+            Q10 = scipy.linalg.block_diag(Q1init, np.eye(
+                states_size + env.nx - Q1init.shape[0]))
 
-        projector = Projector(
-            computation_graph_args['states_size'],
-            computation_graph_args['size'],
-            AG, BG, CG=CG,
-        )
+            # Projector for stability
+            projector = ProjectorIQC(states_size, size, env, Q10=Q10)
+        else:
+            AG, BG, CG = env.get_system_params()
+
+            Q1initializer = Q1_init(AG, BG, CG=CG)
+            Q1 = Q1initializer.compute()
+            Q10 = scipy.linalg.block_diag(Q1, np.eye(states_size - env.nx))
+
+            projector = Projector(
+                computation_graph_args['states_size'],
+                computation_graph_args['size'],
+                AG, BG,
+                CG=CG,
+                Q10=Q10,
+            )
 
     # ========================================================================================#
     # Training Loop
@@ -151,14 +169,14 @@ def train(
 
         q_n, adv_n = agent.estimate_return(ob_no, re_n)
 
-        out = agent.update_parameters(ob_no, q_n, adv_n, lp_n)
+        out = agent.update_parameters(ob_no, q_n, adv_n, lp_n, grad_clip=grad_clip_val)
         if agent.nn_baseline:
             a_loss, c_loss = out
         else:
             a_loss = out
 
         if tilde:
-            totdiff, xidiff, udiff, vdiff = projector.updateRNN(agent.rnn)
+            totdiff, xidiff, udiff, vdiff = projector.updateRNN(agent.rnn, clip_value=proj_clip_val)
 
         # Log diagnostics
         returns = [path["reward"].sum() for path in paths]

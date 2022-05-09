@@ -10,6 +10,10 @@ from .pendulum import InvPendulumLinEnv
 from .pendulum import InvPendulumLinEnvPartial
 from .pendulum import InvPendulumLinEnvPartialNorm
 
+from .pendulumNL import InvPendulumNLEnv
+from .pendulumNL import InvPendulumNLEnvPartial
+from .pendulumNL import InvPendulumNLEnvPartialNorm
+
 from .powergrid import PowergridEnv
 from .powergrid import PowergridEnvPartial
 from .powergrid import PowergridEnvPartialNorm
@@ -27,6 +31,13 @@ def get_env(exp_name, factor):
             env = CartpoleEnvPartial(factor=factor)
         else:
             env = CartpoleEnv(factor=factor)
+    elif 'pendulumNL' in exp_name:
+        if 'partial' in exp_name and 'norm' in exp_name:
+            env = InvPendulumNLEnvPartialNorm(factor=factor)
+        elif 'partial' in exp_name:
+            env = InvPendulumNLEnvPartial(factor=factor)
+        else:
+            env = InvPendulumNLEnv(factor=factor)
     elif 'pendulum' in exp_name:
         if 'partial' in exp_name and 'norm' in exp_name:
             env = InvPendulumLinEnvPartialNorm(factor=factor)
