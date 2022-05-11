@@ -113,6 +113,7 @@ class RobustRNNCell(nn.Module):
             self,
             y,        # ([B]atch, [I]nput), or just (I,)
             xi=None,  # ([B]atch, [S]tate), or just (S,)
+
     ):
         assert y.dim() in (1, 2)
 
@@ -174,11 +175,12 @@ class RobRNNActor(RobustRNNCell):
             y,        # ([B]atch, [I]nput), or just (I,)
             xi=None,  # ([B]atch, [S]tate), or just (S,)
             eps=1e-8,
+            sample=True
     ):
         u, xi_, log_std = super(RobRNNActor, self).forward(y, xi=xi)
 
         dist = Normal(u, (eps + log_std).exp())
-        action = dist.sample()
+        action = dist.sample() if sample else u.clone().detach()
         log_p = dist.log_prob(action)
 
         return u, xi_, dist, action, log_p
@@ -408,11 +410,12 @@ class RobRNNTildeActor(RobustRNNCellTilde):
             y,        # ([B]atch, [I]nput), or just (I,)
             xi=None,  # ([B]atch, [S]tate), or just (S,)
             eps=1e-8,
+            sample=True
     ):
         u, xi_, log_std = super(RobRNNTildeActor, self).forward(y, xi=xi)
 
         dist = Normal(u, (eps + log_std).exp())
-        action = dist.sample()
+        action = dist.sample() if sample else u.clone().detach()
         log_p = dist.log_prob(action)
 
         return u, xi_, dist, action, log_p

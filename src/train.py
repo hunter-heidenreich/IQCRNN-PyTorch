@@ -41,8 +41,8 @@ def train(
         tilde,
         init_trunc_norm,
         verbose=True,
-        grad_clip_val=0.5,
-        proj_clip_val=0.2,
+        grad_clip_val=10.0,
+        proj_clip_val=None,
         iqc=False,
 ):
     # configure logger

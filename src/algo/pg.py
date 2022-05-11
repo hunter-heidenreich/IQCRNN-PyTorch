@@ -134,7 +134,7 @@ class PGAgent:
                 tbar.update(n=pathlength(path))
         return paths, timesteps_this_batch
 
-    def sample_trajectory(self, env, animate_this_episode, init_state=None, horizon=None):
+    def sample_trajectory(self, env, animate_this_episode, init_state=None, horizon=None, sample=True):
         # setup storage
         obs, acs, rewards, log_ps, dones, sts = [], [], [], [], [], []
 
@@ -159,7 +159,7 @@ class PGAgent:
             obs.append(ob)
 
             # forward pass
-            ac_mean, xi, _, ac, log_p = self.rnn.forward(ob, xi=xi)
+            ac_mean, xi, _, ac, log_p = self.rnn.forward(ob, xi=xi, sample=sample)
 
             if self.rnn_test_nostates:
                 xi = xi0.clone()
